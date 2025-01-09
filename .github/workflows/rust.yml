@@ -21,6 +21,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             suffix: ".exe"
+            cross: true
           - os: macos-latest
             target: x86_64-apple-darwin
             suffix: ""
@@ -34,6 +35,17 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
+      - name: Install Windows Dependencies
+        if: matrix.os == 'windows-latest'
+        run: |
+          cargo install -f cargo-vcpkg
+          cargo vcpkg build
+      - name: Enable Windows Terminal Features
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
+          echo "VCPKGRS_DYNAMIC=1" >> $GITHUB_ENV
+        shell: bash
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
       - name: Run tests
