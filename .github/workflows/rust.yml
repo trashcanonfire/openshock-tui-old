@@ -33,29 +33,40 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust Toolchain and Target
+        uses: actions-rs/toolchain@v1
         with:
-          targets: ${{ matrix.target }}
-      - name: Install cross-compilation dependencies
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Install cross-compilation dependencies (Linux only)
+        if: startsWith(matrix.target, 'aarch64-unknown-linux-gnu') && matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
+
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
+
       - name: Run tests
         run: cargo test --verbose
+
       - name: Prepare artifact
         run: |
           mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.suffix }} artifacts/${{ env.BINARY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+          cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.suffix }} \
+            artifacts/${{ env.BINARY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
         shell: bash
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BINARY_NAME }}-${{ matrix.target }}
           path: artifacts/${{ env.BINARY_NAME }}-${{ matrix.target }}${{ matrix.suffix }}
+
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
@@ -66,16 +77,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
+          merge: true
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/*
+          files: artifacts/*
           generate_release_notes: true
-      # - name: Cargo Publish
-      #   uses: ryohidaka/action-cargo-publish@v0.1.0
-      #   with:
-      #     path: src
-      #     token: ${{secrets.CARGO_KEY}}
-      #     dry-run: false
